@@ -1,0 +1,145 @@
+---
+title: "Introduction to the `flexmeta` package"
+author: "Hisashi Noma and Kengo Nagashima"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Introduction to the `flexmeta` package}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+The `flexmeta` package implements flexible random-effects distribution models that are defined as
+
+$$Y_i \sim N(\theta_i, \sigma_i^2)$$
+$$\theta_i \sim F$$
+
+for $i=1,\ldots,K$, where $\theta_i$ is the true effect size of the $i$-th study, $\sigma_i^2$ is within-studies variances that is usually assumed to be known and fixed to their valid estimates, and $F$ corresponds to the random-effects distribution that expresses the probability distribution how $\theta_i$ is heterogeneity distributed.
+
+The `flexmeta` package supports seven compled `stanmodel` objects of random-effects distributions, $F$, as follows:
+
+* `sm_norm`: A `stanmodel` object for a normal random-effects distribution, $F \sim N(\xi, \omega)$, where $\xi$ is location (mean), and $\omega$ is scale parameter (SD).
+* `sm_t`: A `stanmodel` object for a non-central student-$t$ random-effects distribution, $F \sim t(\nu, \mu, \omega)$, where $\xi$ is location (mean), $\omega$ is scale parameter (SD), and $\nu$ is d.f.
+* `sm_sn`: A `stanmodel` object for a skew normal random-effects distribution, $F \sim skew-N(\xi, \omega, \alpha)$, where $\xi$ is location (mean), $\omega$ is scale parameter (SD), and $\alpha$ is shape parameter.
+* `sm_t`: A `stanmodel` object for a skew $t$ random-effects distribution, $F \sim skew-t(\mu, \omega, \nu, \alpha)$, where $\xi$ is location (mean), $\omega$ is scale parameter (SD), and $\alpha$ is shape parameter.
+* `sm_as`: A `stanmodel` object for an asymmetric Subboton (Type II) random-effects distribution, $F \sim AS2(\mu, \omega, \nu, \alpha)$, where $\xi$ is location (mean), $\omega$ is scale parameter (SD), and $\alpha$ is shape parameter.
+* `sm_jf`: A `stanmodel` object for an Jones-Faddy random-effects distribution, $F \sim JF(\mu, \omega, a, b)$, where $\xi$ is location (mean), $\omega$ is scale parameter (SD), and $a$ and $b$ are distribution parameters regulate the skewness and kurtosis.
+* `sm_sas`: A `stanmodel` object for an Sinh-arcsinh random-effects distribution, $F \sim SAS(\mu, \omega, \delta, \epsilon)$, where $\xi$ is location (mean), $\omega$ is scale parameter (SD), $\delta$ is kurtosis parameter and $\epsilon$ is skewness parameter.
+
+The `data` should be a list of study data:
+
+* `K`: A numeric value of the number of studies.
+* `y`: A numeric vector of the effect size estimates.
+* `se`: A numeric vector of the within studies standard error estimates.
+
+Here are examples of the `flexmeta` package:
+```{r, echo = TRUE, fig.width = 6, fig.height = 6}
+require("flexmeta")
+require("rstan")
+options(mc.cores = parallel::detectCores())
+
+data("clbp")
+dat <- convert_mean(clbp$n1, clbp$m1, clbp$s1, clbp$n2, clbp$m2, clbp$s2)
+dat <- list(K = length(dat$y), y = dat$y, se = dat$se)
+
+# skew-normal example
+fit <- sampling(sm_sn, data = dat,
+  chains = 1, warmup = 5000, iter = 30000, seed = 2645751)
+pred_f(fit)
+mu_f(fit)
+dic(fit, dat)
+```
+
+```{r, eval = FALSE}
+require("flexmeta")
+require("rstan")
+options(mc.cores = parallel::detectCores())
+
+data("clbp")
+dat <- convert_mean(clbp$n1, clbp$m1, clbp$s1, clbp$n2, clbp$m2, clbp$s2)
+dat <- list(K = length(dat$y), y = dat$y, se = dat$se)
+
+# normal
+fit1 <- sampling(sm_norm, data = dat,
+  chains = 1, warmup = 5000, iter = 30000, seed = 2645751)
+# student-t
+fit2 <- sampling(sm_t, data = dat,
+  chains = 1, warmup = 5000, iter = 30000, seed = 2645751)
+# skew-normal
+fit3 <- sampling(sm_sn, data = dat,
+  chains = 1, warmup = 5000, iter = 30000, seed = 2645751)
+# skew-t
+fit4 <- sampling(sm_st, data = dat,
+  chains = 1, warmup = 5000, iter = 30000, seed = 2645751)
+# asymmetric Subboton (Type II)
+fit5 <- sampling(sm_as, data = dat,
+  chains = 1, warmup = 5000, iter = 30000, seed = 2645751)
+# Jones-Faddy
+fit6 <- sampling(sm_jf, data = dat,
+  chains = 1, warmup = 5000, iter = 30000, seed = 2645751)
+# Sinh-arcsinh
+fit7 <- sampling(sm_sas, data = dat, init = init_sas,
+  chains = 1, warmup = 5000, iter = 30000, seed = 2645751)
+
+e1 <- extract(fit1)
+e2 <- extract(fit2)
+e3 <- extract(fit3)
+e4 <- extract(fit4)
+e5 <- extract(fit5)
+e6 <- extract(fit6)
+e7 <- extract(fit7)
+
+# Plot Predictive Distributions
+par(mfrow = c(2, 4))
+hist(e1$theta_new, br = 150, xlim = c(-40, 30), ylim = c(0, .1),
+  freq = FALSE, main = "(a) Normal distribution",
+  xlab = "Mean difference", border = "gray")
+ds <- density(e1$theta_new)
+lines(ds$x, ds$y, col = 4, lwd = 2)
+
+hist(e2$theta_new, br = 900, xlim = c(-40, 30), ylim = c(0, .1),
+  freq = FALSE, main = "(b) t-distribution",
+  xlab = "Mean difference", border = "gray")
+ds <- density(e2$theta_new)
+lines(ds$x, ds$y, col = 4, lwd = 2)
+
+hist(e3$theta_new, br = 100, xlim = c(-40, 30), ylim = c(0, .1),
+  freq = FALSE, main = "(c) Skew normal distribution",
+  xlab = "Mean difference", border = "gray")
+ds <- density(e3$theta_new)
+lines(ds$x, ds$y, col = 4, lwd = 2)
+
+hist(e4$theta_new, br = 400, xlim = c(-40, 30), ylim = c(0, .1),
+  freq = FALSE, main = "(d) Skew t-distribution",
+  xlab = "Mean difference", border = "gray")
+ds <- density(e4$theta_new)
+lines(ds$x, ds$y, col = 4, lwd = 2)
+
+hist(e5$theta_new, br = 200, xlim = c(-40, 30), ylim = c(0, .1),
+  freq = FALSE, main = "(e) Asymmetric Subbotin distribution",
+  xlab = "Mean difference", border = "gray")
+ds <- density(e5$theta_new)
+lines(ds$x, ds$y, col = 4, lwd = 2)
+
+hist(e6$theta_new, br = 400, xlim = c(-40, 30), ylim = c(0, .1),
+  freq = FALSE, main = "(f) Jones-Faddy distribution",
+  xlab = "Mean difference", border = "gray")
+ds <- density(e6$theta_new)
+lines(ds$x, ds$y, col = 4, lwd = 2)
+
+hist(e7$theta_new, br = 300, xlim = c(-40, 30), ylim = c(0, .1),
+  freq = FALSE, main = "(g) Sinh-arcsinh distribution",
+  xlab = "Mean difference", border = "gray")
+ds <- density(e7$theta_new)
+lines(ds$x, ds$y, col = 4, lwd = 2)
+
+# DICs
+dic(fit1, dat)
+dic(fit2, dat)
+dic(fit3, dat)
+dic(fit4, dat)
+dic(fit5, dat)
+dic(fit6, dat)
+dic(fit7, dat)
+```
