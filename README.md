@@ -21,7 +21,7 @@ The posterior distributions of the summary statistics and the predictive distrib
 ``` r
 # Or the the development version from GitHub:
 # install.packages("devtools")
-devtools::install_github("nshi-stat/flexmeta")
+devtools::install_github("nomahi/flexmeta")
 ```
 
-Downloads: [please see the release page](https://github.com/nshi-stat/flexmeta/releases)
+Downloads: [please see the release page](https://github.com/nomahi/flexmeta/releases)
